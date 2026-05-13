@@ -1,0 +1,134 @@
+{
+  "project": "waveshare-relay-b",
+  "version": "1.5.1",
+  "description": "Waveshare RPi Relay Board (B) controller for Raspberry Pi 5 using libgpiod",
+  "created": "2025-05-13",
+
+  "board": {
+    "manufacturer": "Waveshare",
+    "model": "RPi Relay Board (B)",
+    "url": "https://www.waveshare.com/wiki/RPi_Relay_Board_(B)",
+    "channels": 8,
+    "logic": "active-low",
+    "gpio_value_on": 0,
+    "gpio_value_off": 1,
+    "pin_mapping": {
+      "CH1": { "bcm": 5,  "board_header": 29 },
+      "CH2": { "bcm": 6,  "board_header": 31 },
+      "CH3": { "bcm": 13, "board_header": 33 },
+      "CH4": { "bcm": 16, "board_header": 36 },
+      "CH5": { "bcm": 19, "board_header": 35 },
+      "CH6": { "bcm": 20, "board_header": 38 },
+      "CH7": { "bcm": 21, "board_header": 40 },
+      "CH8": { "bcm": 26, "board_header": 37 }
+    }
+  },
+
+  "platform": {
+    "target": "Raspberry Pi 5",
+    "os": "Raspberry Pi OS Bookworm (Debian 12+)",
+    "gpio_driver": "libgpiod",
+    "gpio_driver_version_supported": ["1.x", "2.x"],
+    "gpio_chip": "auto-detected (usually gpiochip0 on RPi 5)",
+    "deprecated_interfaces": ["sysfs (/sys/class/gpio)", "RPi.GPIO Python library"]
+  },
+
+  "dependencies": {
+    "apt": ["gpiod", "bc"],
+    "commands_required": ["gpioset", "gpioget", "gpiodetect", "gpioinfo"],
+    "install_command": "sudo apt update && sudo apt install gpiod bc"
+  },
+
+  "files": {
+    "relay_control.sh": {
+      "type": "main_script",
+      "description": "Bash relay controller with persistent GPIO daemon management",
+      "executable": true,
+      "shebang": "#!/bin/bash"
+    },
+    "relay_web.py": {
+      "type": "web_server",
+      "description": "Flask REST API + HTML dashboard for 8-channel relay web control",
+      "port": 8080,
+      "requires": "python3-flask"
+    },
+    "templates/index.html": {
+      "type": "web_ui",
+      "description": "Live HTML dashboard with 8 toggle buttons, auto-refresh every 3s"
+    },
+    "README.txt": {
+      "type": "documentation",
+      "description": "User-facing installation, usage, and troubleshooting guide"
+    },
+    "CLAUDE.md": {
+      "type": "ai_context",
+      "description": "Critical facts, architecture notes, and constraints for AI assistants"
+    },
+    "CLAUDE.json": {
+      "type": "project_metadata",
+      "description": "Machine-readable project metadata and configuration"
+    }
+  },
+
+  "runtime": {
+    "state_directory": "/tmp/relay_board_b",
+    "log_file": "/tmp/relay_board_b.log",
+    "daemon_mechanism": {
+      "libgpiod_v1": "gpioset --mode=signal <chip> <pin>=<value> &",
+      "libgpiod_v2": "gpioset --interactive <chip> <pin>=<value> < <fifo> & sleep infinity > <fifo> &"
+    },
+    "state_files": {
+      "pattern": "/tmp/relay_board_b/ch{N}.state",
+      "values": ["on", "off", "unknown"]
+    },
+    "pid_files": {
+      "pattern": "/tmp/relay_board_b/ch{N}.pid",
+      "note": "v2.x has two PIDs (gpioset + feeder), one per line"
+    }
+  },
+
+  "commands": {
+    "on":     { "args": "<1|2|3|all>",   "description": "Energize relay(s)" },
+    "off":    { "args": "<1|2|3|all>",   "description": "De-energize relay(s)" },
+    "toggle": { "args": "<1|2|3>",       "description": "Toggle relay state" },
+    "pulse":  { "args": "<1|2|3> [ms]",  "description": "Pulse ON for duration (default 1000ms)" },
+    "status": { "args": "",              "description": "Show state table and daemon health" },
+    "reset":  { "args": "",              "description": "Turn all relays OFF" },
+    "stop":   { "args": "",              "description": "Kill all daemons; lines float" },
+    "help":   { "args": "",              "description": "Show usage" }
+  },
+
+  "known_issues": {
+    "gpioget_exclusive_access": {
+      "description": "gpioget cannot read a line held by gpioset --mode=signal",
+      "impact": "status command relies on saved state files, not live GPIO reads",
+      "mitigation": "State files are updated on every relay_on/off call"
+    },
+    "rpi5_chip_number": {
+      "description": "RPi 5 GPIO chip may be gpiochip0 or gpiochip4 depending on firmware",
+      "mitigation": "Script auto-detects the chip with the highest line count (≥27 required)"
+    },
+    "mode_exit_antipattern": {
+      "description": "gpioset --mode=exit releases the line immediately on exit",
+      "impact": "Relay clicks and releases in < 1ms — useless for sustained control",
+      "mitigation": "Script uses --mode=signal (v1.x) or FIFO+interactive (v2.x)"
+    },
+    "bash_dynamic_scoping_cmd_var": {
+      "description": "Bash has dynamic variable scope — a 'for cmd in ...' loop in a helper function clobbers the caller's 'local cmd' variable",
+      "impact": "In v1.3.0, check_deps() used 'for cmd in gpioset gpioget gpiodetect', overwriting main()'s local cmd='stop' with 'gpiodetect'. The dispatch case never matched and the script silently exited 0.",
+      "mitigation": "v1.4.0 fix: renamed loop variable in check_deps to 'dep'. Never reuse outer function variable names in inner loop variables."
+    },
+    "state_lost_on_reboot": {
+      "description": "State files and daemon PIDs are in /tmp — lost on reboot",
+      "mitigation": "Add a systemd service that calls 'relay_control.sh reset' on startup"
+    }
+  },
+
+  "environment_variables": {
+    "DEBUG": {
+      "values": ["0", "1"],
+      "default": "0",
+      "description": "Set to 1 for verbose chip/version/state debug output"
+    }
+  }
+}
