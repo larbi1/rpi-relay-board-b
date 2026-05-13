@@ -1,6 +1,6 @@
 #!/bin/bash
 ###################################################################
-##   Waveshare RPi Relay Board (B) — Controller v1.5.1           ##
+##   Waveshare RPi Relay Board (B) — Controller v1.6.0           ##
 ##   Raspberry Pi 5 · libgpiod v2.x / v1.x                      ##
 ###################################################################
 ##  Board:    Waveshare RPi Relay Board (B)  — 8 channels        ##
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # ── Constants ────────────────────────────────────────────────────
-readonly VERSION="1.5.1"
+readonly VERSION="1.6.0"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly STATE_DIR="/tmp/relay_board_b"
 readonly LOG_FILE="/tmp/relay_board_b.log"
@@ -383,14 +383,16 @@ _validate_channel() {
 }
 
 _resolve_target() {
-    local cmd=$1 target=${2:-}
-    [[ -n "$target" ]] || die "Missing channel. Usage: ${SCRIPT_NAME} ${cmd} <1-8|all>"
-    if [[ "$target" == "all" ]]; then
+    local cmd=$1; shift
+    (( $# > 0 )) || die "Missing channel. Usage: ${SCRIPT_NAME} ${cmd} <1-8 ...| all>"
+    if [[ "$1" == "all" ]]; then
         [[ "$cmd" =~ ^(on|off)$ ]] || die "'all' is only valid for on/off"
         for ch in "${CHANNELS[@]}"; do "relay_${cmd}" "$ch"; done
     else
-        _validate_channel "$target"
-        "relay_${cmd}" "$target"
+        for target in "$@"; do
+            _validate_channel "$target"
+            "relay_${cmd}" "$target"
+        done
     fi
 }
 
@@ -405,9 +407,9 @@ ${BOLD}USAGE${RESET}
   ${SCRIPT_NAME} <command> [channel] [options]
 
 ${BOLD}COMMANDS${RESET}
-  on     <1-8|all>             Turn relay(s) ON  (GPIO goes LOW)
-  off    <1-8|all>             Turn relay(s) OFF (GPIO goes HIGH)
-  toggle <1-8>                 Toggle relay state
+  on     <1-8 ...| all>        Turn relay(s) ON  (GPIO goes LOW)
+  off    <1-8 ...| all>        Turn relay(s) OFF (GPIO goes HIGH)
+  toggle <1-8 ...>             Toggle relay state(s)
   pulse  <1-8> [ms]            Pulse ON for duration (default: 1000 ms)
   status                      Show all relay states and daemon health
   reset                       Turn all relays OFF (safe shutdown)
@@ -415,9 +417,10 @@ ${BOLD}COMMANDS${RESET}
   help                        Show this message
 
 ${BOLD}EXAMPLES${RESET}
-  ${SCRIPT_NAME} on 1              # Turn CH1 ON  (BCM 5 -> LOW)
+  ${SCRIPT_NAME} on 1 3 5 7        # Turn CH1 CH3 CH5 CH7 ON
+  ${SCRIPT_NAME} off 2 4 6         # Turn CH2 CH4 CH6 OFF
   ${SCRIPT_NAME} off all           # Turn all 8 relays OFF
-  ${SCRIPT_NAME} toggle 4          # Toggle CH4
+  ${SCRIPT_NAME} toggle 1 3        # Toggle CH1 and CH3
   ${SCRIPT_NAME} pulse 3 500       # Pulse CH3 for 500 ms
   ${SCRIPT_NAME} status            # Current states + daemon PIDs
 
@@ -464,10 +467,10 @@ main() {
     init
 
     case "$cmd" in
-        on|off)   _resolve_target "$cmd" "${1:-}" ;;
+        on|off)   _resolve_target "$cmd" "$@" ;;
         toggle)
-            [[ -n "${1:-}" ]] || die "Missing channel. Usage: ${SCRIPT_NAME} toggle <1-8>"
-            relay_toggle "$1"
+            (( $# > 0 )) || die "Missing channel. Usage: ${SCRIPT_NAME} toggle <1-8> [...]"
+            for ch in "$@"; do _validate_channel "$ch"; relay_toggle "$ch"; done
             ;;
         pulse)
             [[ -n "${1:-}" ]] || die "Missing channel. Usage: ${SCRIPT_NAME} pulse <1-8> [ms]"
