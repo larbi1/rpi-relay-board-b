@@ -56,6 +56,11 @@
       "type": "web_ui",
       "description": "Live HTML dashboard with 8 toggle buttons, auto-refresh every 3s"
     },
+    "relay-web.service": {
+      "type": "systemd_unit",
+      "description": "systemd service to manage relay_web.py — enable once, then use systemctl start/stop/status relay-web",
+      "install_path": "/etc/systemd/system/relay-web.service"
+    },
     "README.txt": {
       "type": "documentation",
       "description": "User-facing installation, usage, and troubleshooting guide"

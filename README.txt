@@ -114,38 +114,28 @@ WEB SERVER
     curl -X POST "http://<rpi5-ip>:8080/api/relay/3/pulse?ms=500"
     curl -X POST http://<rpi5-ip>:8080/api/all/off
 
-  Run on boot (systemd):
-    See SYSTEMD AUTOSTART section below.
+  Run on boot (systemd — recommended):
+    See SYSTEMD SERVICE section below.
 
 
-SYSTEMD AUTOSTART
------------------
-  To start the web server automatically on boot:
+SYSTEMD SERVICE
+---------------
+  A service file is included: relay-web.service
 
-  1. Create service file:
-       sudo nano /etc/systemd/system/relay-web.service
+  Install and enable (one time):
+    sudo cp relay-web.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable relay-web
+    sudo systemctl start relay-web
 
-     Paste:
-       [Unit]
-       Description=Waveshare Relay Board Web Controller
-       After=network.target
+  Daily usage:
+    sudo systemctl start   relay-web   # start
+    sudo systemctl stop    relay-web   # stop
+    sudo systemctl restart relay-web   # restart
+    sudo systemctl status  relay-web   # status + last log lines
 
-       [Service]
-       ExecStart=/usr/bin/python3 /home/akaw/waveshare-relay-b/relay_web.py
-       WorkingDirectory=/home/akaw/waveshare-relay-b
-       Restart=on-failure
-       User=akaw
-
-       [Install]
-       WantedBy=multi-user.target
-
-  2. Enable and start:
-       sudo systemctl daemon-reload
-       sudo systemctl enable relay-web
-       sudo systemctl start relay-web
-
-  3. Check status:
-       sudo systemctl status relay-web
+  The service starts automatically on every boot (enabled).
+  Restarts automatically if it crashes (Restart=on-failure).
 
 
 HOW IT WORKS — PERSISTENT GPIO

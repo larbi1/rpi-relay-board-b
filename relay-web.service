@@ -1,0 +1,14 @@
+[Unit]
+Description=Waveshare RPi Relay Board (B) — Web Controller
+After=network.target
+
+[Service]
+Type=simple
+User=akaw
+WorkingDirectory=/home/akaw/waveshare-relay-b
+ExecStart=/usr/bin/python3 relay_web.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
